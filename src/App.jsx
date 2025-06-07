@@ -121,21 +121,40 @@ function App() {
     
     try {
       // Parse time from the selected time slot (e.g., '10:00 - 12:00' -> ['10:00', '12:00'])
-      const [startTime, endTime] = selectedTime.split(' - ').map(t => t.split(':').map(Number));
+      const timeSlots = selectedTime.split(' - ');
+      if (timeSlots.length !== 2) {
+        throw new Error('Неверный формат времени');
+      }
       
-      // Create start and end dates
+      const [startTimeStr, endTimeStr] = timeSlots;
+      const [startHours, startMinutes] = startTimeStr.split(':').map(Number);
+      const [endHours, endMinutes] = endTimeStr.split(':').map(Number);
+      
+      if (isNaN(startHours) || isNaN(startMinutes) || isNaN(endHours) || isNaN(endMinutes)) {
+        throw new Error('Неверный формат времени');
+      }
+      
+      // Create date objects in local timezone
       const startDateTime = new Date(selectedDate);
-      startDateTime.setHours(startTime[0], startTime[1], 0, 0);
+      startDateTime.setHours(startHours, startMinutes, 0, 0);
       
       const endDateTime = new Date(selectedDate);
-      endDateTime.setHours(endTime[0], endTime[1], 0, 0);
+      endDateTime.setHours(endHours, endMinutes, 0, 0);
+      
+      // Format dates in ISO string without timezone offset
+      const formatISOLocal = (date) => {
+        const pad = (n) => (n < 10 ? '0' + n : n);
+        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:00`;
+      };
       
       const reservationData = {
         tgUsername: tgUser?.username || `user_${Date.now()}`,
         bathhouseId: 1, // You might want to make this dynamic
-        startDateTime: startDateTime.toISOString(),
-        endDateTime: endDateTime.toISOString()
+        startDateTime: formatISOLocal(startDateTime),
+        endDateTime: formatISOLocal(endDateTime)
       };
+      
+      console.log('Sending reservation data:', JSON.stringify(reservationData, null, 2));
       
       const response = await fetch("https://octopus-app-jwzw3.ondigitalocean.app/reservations", {
         method: 'POST',
