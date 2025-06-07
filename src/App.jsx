@@ -189,8 +189,9 @@ function App() {
       console.log('Sending reservation data:', JSON.stringify(reservationData, null, 2));
       
       console.log('Sending request to API...');
+      let response;
       try {
-        const response = await fetch("https://octopus-app-jwzw3.ondigitalocean.app/reservations", {
+        response = await fetch("https://octopus-app-jwzw3.ondigitalocean.app/reservations", {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -201,26 +202,38 @@ function App() {
         
         console.log('Response status:', response.status);
         
+        // Read the response body once and store it
+        const responseText = await response.text();
+        let responseData;
+        
+        try {
+          responseData = responseText ? JSON.parse(responseText) : {};
+        } catch (e) {
+          console.warn('Failed to parse JSON response:', e);
+          responseData = { message: responseText };
+        }
+        
         if (!response.ok) {
-          let errorMessage = `HTTP error! status: ${response.status}`;
-          try {
-            const errorData = await response.json();
-            console.error('Error response:', errorData);
-            errorMessage = errorData.message || errorMessage;
-          } catch (parseError) {
-            console.error('Error parsing error response:', parseError);
-            const text = await response.text();
-            errorMessage = text || errorMessage;
-          }
+          console.error('Error response:', responseData);
+          const errorMessage = responseData.message || `HTTP error! status: ${response.status}`;
           throw new Error(`Ошибка при бронировании: ${errorMessage}`);
         }
         
-        const responseData = await response.json();
         console.log('Booking successful:', responseData);
+        return responseData;
         
       } catch (fetchError) {
         console.error('Fetch error:', fetchError);
+        // Check if the error is due to CORS
+        if (fetchError.name === 'TypeError' && fetchError.message.includes('Failed to fetch')) {
+          throw new Error('Не удалось подключиться к серверу. Пожалуйста, проверьте подключение к интернету.');
+        }
         throw new Error(`Ошибка соединения: ${fetchError.message}`);
+      } finally {
+        // Ensure we don't leave any resources locked
+        if (response && typeof response.body?.cancel === 'function') {
+          response.body.cancel();
+        }
       }
       
       // Show success animation
