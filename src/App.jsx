@@ -120,20 +120,40 @@ function App() {
     setBookingError(null);
     
     try {
+      console.log('=== Starting booking process ===');
+      console.log('Selected date:', selectedDate);
+      console.log('Selected time:', selectedTime);
       // Parse time from the selected time slot (e.g., '10:00 - 12:00' -> ['10:00', '12:00'])
+      console.log('Parsing time slot...');
       const timeSlots = selectedTime.split(' - ');
+      console.log('Time slots:', timeSlots);
+      
       if (timeSlots.length !== 2) {
-        throw new Error('Неверный формат времени');
+        throw new Error(`Неверный формат времени: ожидается формат 'HH:MM - HH:MM', получено '${selectedTime}'`);
       }
       
       const [startTimeStr, endTimeStr] = timeSlots;
-      const [startHours, startMinutes] = startTimeStr.split(':').map(Number);
-      const [endHours, endMinutes] = endTimeStr.split(':').map(Number);
+      console.log('Start time string:', startTimeStr, 'End time string:', endTimeStr);
       
-      if (isNaN(startHours) || isNaN(startMinutes) || isNaN(endHours) || isNaN(endMinutes)) {
-        throw new Error('Неверный формат времени');
+      const startTimeParts = startTimeStr.split(':');
+      const endTimeParts = endTimeStr.split(':');
+      
+      if (startTimeParts.length !== 2 || endTimeParts.length !== 2) {
+        throw new Error(`Неверный формат времени: используйте формат 'HH:MM'`);
       }
       
+      const startHours = parseInt(startTimeParts[0], 10);
+      const startMinutes = parseInt(startTimeParts[1], 10);
+      const endHours = parseInt(endTimeParts[0], 10);
+      const endMinutes = parseInt(endTimeParts[1], 10);
+      
+      console.log('Parsed time values:', { startHours, startMinutes, endHours, endMinutes });
+      
+      if (isNaN(startHours) || isNaN(startMinutes) || isNaN(endHours) || isNaN(endMinutes)) {
+        throw new Error(`Неверные числовые значения времени: ${startHours}:${startMinutes} - ${endHours}:${endMinutes}`);
+      }
+      
+      console.log('Creating date objects...');
       // Create date objects in local timezone
       const startDateTime = new Date(selectedDate);
       startDateTime.setHours(startHours, startMinutes, 0, 0);
@@ -141,10 +161,22 @@ function App() {
       const endDateTime = new Date(selectedDate);
       endDateTime.setHours(endHours, endMinutes, 0, 0);
       
+      console.log('Created date objects:', { startDateTime, endDateTime });
+      
       // Format dates in ISO string without timezone offset
       const formatISOLocal = (date) => {
-        const pad = (n) => (n < 10 ? '0' + n : n);
-        return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:00`;
+        try {
+          if (!(date instanceof Date) || isNaN(date)) {
+            throw new Error('Invalid date object');
+          }
+          const pad = (n) => (n < 10 ? '0' + n : n);
+          const result = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:00`;
+          console.log('Formatted date:', result);
+          return result;
+        } catch (error) {
+          console.error('Error formatting date:', error, 'Date value:', date);
+          throw new Error(`Ошибка форматирования даты: ${error.message}`);
+        }
       };
       
       const reservationData = {
@@ -156,17 +188,39 @@ function App() {
       
       console.log('Sending reservation data:', JSON.stringify(reservationData, null, 2));
       
-      const response = await fetch("https://octopus-app-jwzw3.ondigitalocean.app/reservations", {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(reservationData),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Ошибка при бронировании');
+      console.log('Sending request to API...');
+      try {
+        const response = await fetch("https://octopus-app-jwzw3.ondigitalocean.app/reservations", {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify(reservationData),
+        });
+        
+        console.log('Response status:', response.status);
+        
+        if (!response.ok) {
+          let errorMessage = `HTTP error! status: ${response.status}`;
+          try {
+            const errorData = await response.json();
+            console.error('Error response:', errorData);
+            errorMessage = errorData.message || errorMessage;
+          } catch (parseError) {
+            console.error('Error parsing error response:', parseError);
+            const text = await response.text();
+            errorMessage = text || errorMessage;
+          }
+          throw new Error(`Ошибка при бронировании: ${errorMessage}`);
+        }
+        
+        const responseData = await response.json();
+        console.log('Booking successful:', responseData);
+        
+      } catch (fetchError) {
+        console.error('Fetch error:', fetchError);
+        throw new Error(`Ошибка соединения: ${fetchError.message}`);
       }
       
       // Show success animation
@@ -179,9 +233,25 @@ function App() {
       
     } catch (error) {
       console.error('Booking error:', error);
-      setBookingError(error.message || 'Произошла ошибка при бронировании');
+      // Display detailed error message in console for debugging
+      console.error('Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+        selectedDate,
+        selectedTime,
+        currentTime: new Date().toISOString()
+      });
+      
+      // Show user-friendly error message
+      const errorMessage = error.message.includes('Failed to fetch') 
+        ? 'Не удалось подключиться к серверу. Пожалуйста, проверьте подключение к интернету.'
+        : error.message || 'Произошла ошибка при бронировании';
+        
+      setBookingError(errorMessage);
     } finally {
       setIsBooking(false);
+      console.log('=== Booking process completed ===');
     }
   };
 
