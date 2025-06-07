@@ -31,6 +31,21 @@ const itemVariants = {
 };
 
 function App() {
+  // Get Telegram user data from WebApp
+  const [tgUser, setTgUser] = useState(null);
+  
+  useEffect(() => {
+    // Initialize Telegram WebApp
+    if (window.Telegram?.WebApp) {
+      const tg = window.Telegram.WebApp;
+      tg.expand(); // Expand the WebApp to full height
+      setTgUser(tg.initDataUnsafe?.user);
+      console.log('Telegram user:', tg.initDataUnsafe?.user);
+    } else {
+      console.log('Telegram WebApp not detected, using test mode');
+    }
+  }, []);
+
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedTime, setSelectedTime] = useState('');
   const [availableSlots, setAvailableSlots] = useState([]);
