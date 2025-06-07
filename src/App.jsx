@@ -156,7 +156,7 @@ function App() {
       
       console.log('Sending reservation data:', JSON.stringify(reservationData, null, 2));
       
-      const response = await fetch("https://octopus-app-jwzw3.ondigitalocean.app/reservations", {
+      const response = await fetch("http://localhost:8080/reservations", {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
