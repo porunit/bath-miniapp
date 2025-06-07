@@ -220,6 +220,15 @@ function App() {
         }
         
         console.log('Booking successful:', responseData);
+        
+        // Show success animation
+        setIsBookingConfirmed(true);
+        setTimeout(() => {
+          setIsBookingConfirmed(false);
+          setSelectedDate(null);
+          setSelectedTime('');
+        }, 3000);
+        
         return responseData;
         
       } catch (fetchError) {
@@ -236,13 +245,7 @@ function App() {
         }
       }
       
-      // Show success animation
-      setIsBookingConfirmed(true);
-      setTimeout(() => {
-        setIsBookingConfirmed(false);
-        setSelectedDate(null);
-        setSelectedTime('');
-      }, 3000);
+      // Success animation is now shown after successful API response
       
     } catch (error) {
       console.error('Booking error:', error);
