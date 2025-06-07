@@ -35,6 +35,8 @@ function App() {
   const [selectedTime, setSelectedTime] = useState('');
   const [availableSlots, setAvailableSlots] = useState([]);
   const [isBookingConfirmed, setIsBookingConfirmed] = useState(false);
+  const [isBooking, setIsBooking] = useState(false);
+  const [bookingError, setBookingError] = useState(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const datePickerRef = useRef(null);
   
@@ -96,18 +98,56 @@ function App() {
     </motion.button>
   );
 
-  const handleBooking = () => {
-    if (selectedDate && selectedTime) {
-      // In a real app, you would send this data to your backend
-      // and handle the response
-      setIsBookingConfirmed(true);
+  const handleBooking = async () => {
+    if (!selectedDate || !selectedTime) return;
+    
+    setIsBooking(true);
+    setBookingError(null);
+    
+    try {
+      // Parse time from the selected time slot (e.g., '10:00 - 12:00' -> ['10:00', '12:00'])
+      const [startTime, endTime] = selectedTime.split(' - ').map(t => t.split(':').map(Number));
       
-      // Reset after 3 seconds
+      // Create start and end dates
+      const startDateTime = new Date(selectedDate);
+      startDateTime.setHours(startTime[0], startTime[1], 0, 0);
+      
+      const endDateTime = new Date(selectedDate);
+      endDateTime.setHours(endTime[0], endTime[1], 0, 0);
+      
+      const reservationData = {
+        tgUsername: tgUser?.username || `user_${Date.now()}`,
+        bathhouseId: 1, // You might want to make this dynamic
+        startDateTime: startDateTime.toISOString(),
+        endDateTime: endDateTime.toISOString()
+      };
+      
+      const response = await fetch("https://octopus-app-jwzw3.ondigitalocean.app/reservations", {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(reservationData),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Ошибка при бронировании');
+      }
+      
+      // Show success animation
+      setIsBookingConfirmed(true);
       setTimeout(() => {
         setIsBookingConfirmed(false);
-        setSelectedDate('');
+        setSelectedDate(null);
         setSelectedTime('');
       }, 3000);
+      
+    } catch (error) {
+      console.error('Booking error:', error);
+      setBookingError(error.message || 'Произошла ошибка при бронировании');
+    } finally {
+      setIsBooking(false);
     }
   };
 
@@ -303,16 +343,33 @@ function App() {
                   <h3>Выбрано:</h3>
                   <p>Дата: {selectedDate ? formatDate(selectedDate) : 'не выбрано'}</p>
                   <p>Время: {selectedTime || 'не выбрано'}</p>
-                  <motion.button 
-                    className="btn" 
-                    disabled={!selectedDate || !selectedTime}
-                    onClick={handleBooking}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    layout
-                  >
-                    Забронировать
-                  </motion.button>
+                  <div className="booking-actions">
+                    {bookingError && (
+                      <motion.div 
+                        className="error-message"
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0 }}
+                      >
+                        {bookingError}
+                      </motion.div>
+                    )}
+                    <motion.button 
+                      className="btn" 
+                      disabled={!selectedDate || !selectedTime || isBooking}
+                      onClick={handleBooking}
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      layout
+                    >
+                      {isBooking ? (
+                        <>
+                          <span className="spinner"></span>
+                          <span>Обработка...</span>
+                        </>
+                      ) : 'Забронировать'}
+                    </motion.button>
+                  </div>
                 </motion.div>
               </motion.main>
             </>
